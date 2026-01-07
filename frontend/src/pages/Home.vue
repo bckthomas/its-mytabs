@@ -175,7 +175,6 @@ export default defineComponent({
                 >
                     <router-link class="info" :to="`/tab/${tab.id}`">
                         <div class="title">{{ tab.title }}</div>
-                        <div class="artist">{{ tab.artist }}</div>
                     </router-link>
 
                     <button
