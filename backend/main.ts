@@ -22,6 +22,8 @@ import {
     getTabFilePath,
     getTabFolderPath,
     getTabFullFilePath,
+    importTabsFromImportDir,
+    migrateStorage,
     removeAudio,
     removeYoutube,
     replaceTab,
@@ -47,6 +49,18 @@ export async function main() {
     }
 
     await migrate();
+
+    console.log("Running storage migration...");
+    const migrationResult = await migrateStorage();
+    if (migrationResult.migratedCount > 0 || migrationResult.skippedCount > 0) {
+        console.log(`Storage migration result: ${migrationResult.migratedCount} migrated, ${migrationResult.skippedCount} skipped`);
+    }
+
+    console.log("Scanning import folder...");
+    const importResult = await importTabsFromImportDir();
+    if (importResult.importedCount > 0 || importResult.skippedCount > 0) {
+        console.log(`Import result: ${importResult.importedCount} imported, ${importResult.skippedCount} skipped`);
+    }
 
     const frontendDir = getFrontendDir();
 
@@ -265,7 +279,7 @@ export async function main() {
 
             config = await fixMissingTab(config);
 
-            const filePath = (await isLoggedIn(c)) ? getTabFullFilePath(config.tab) : "";
+            const filePath = (await isLoggedIn(c)) ? await getTabFullFilePath(config.tab) : "";
 
             return c.json({
                 ok: true,
@@ -575,7 +589,7 @@ export async function main() {
             }
 
             const tab = await getTab(id);
-            const filePath = getTabFilePath(tab);
+            const filePath = await getTabFilePath(tab);
 
             // Check if file exists
             if (!await fs.exists(filePath)) {
@@ -660,7 +674,7 @@ export async function main() {
             if (!Deno.build.standalone || Deno.build.os !== "windows") {
                 throw new Error("Open folder is only supported on Windows");
             }
-            const folder = getTabFolderPath(tab);
+            const folder = await getTabFolderPath(tab);
             const child = new Deno.Command("explorer.exe", { args: [folder], stdout: "null", stderr: "null" }).spawn();
             await child.status;
             return c.json({ ok: true });
@@ -679,10 +693,37 @@ export async function main() {
                 throw new Error("Open external is only supported on Windows");
             }
 
-            const fullPath = getTabFullFilePath(tab);
+            const fullPath = await getTabFullFilePath(tab);
             const child = new Deno.Command("cmd", { args: ["/c", "start", "", fullPath], stdout: "null", stderr: "null" }).spawn();
             await child.status;
             return c.json({ ok: true });
+        } catch (e) {
+            return generalError(c, e);
+        }
+    });
+
+    // Admin: Scan import folder
+    app.post("/api/admin/import-scan", async (c) => {
+        try {
+            await checkLogin(c);
+
+            let body: { dryRun?: boolean; importDuplicates?: boolean } = {};
+            const contentType = c.req.header("content-type") || "";
+            if (contentType.toLowerCase().includes("application/json")) {
+                body = await c.req.json();
+            }
+
+            const result = await importTabsFromImportDir({
+                dryRun: body.dryRun,
+                importDuplicates: body.importDuplicates,
+            });
+            return c.json({
+                ok: true,
+                importedCount: result.importedCount,
+                skippedCount: result.skippedCount,
+                duplicateCount: result.duplicateCount,
+                duplicateSamples: result.duplicateSamples,
+            });
         } catch (e) {
             return generalError(c, e);
         }

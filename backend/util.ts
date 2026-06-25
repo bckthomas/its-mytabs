@@ -3,6 +3,7 @@ import * as path from "@std/path";
 import { fileURLToPath } from "node:url";
 import childProcess from "node:child_process";
 import * as jsonc from "@std/jsonc";
+import sanitize from "sanitize-filename";
 import { FLACDecoder } from "@wasm-audio-decoders/flac";
 import { createOggEncoder } from "wasm-media-encoders";
 import { supportedAudioFormatList } from "./common.ts";
@@ -37,6 +38,14 @@ export async function getTabDir() {
 }
 
 export const tabDir = await getTabDir();
+
+export async function getImportDir() {
+    let dir = path.join(dataDir, "import");
+    await fs.ensureDir(dir);
+    return dir;
+}
+
+export const importDir = await getImportDir();
 
 export function isDev() {
     return process.env.NODE_ENV === "development";
@@ -156,4 +165,20 @@ export function checkFilename(filename: string): void {
     if (filename.includes("..") || filename.includes("/") || filename.includes("\\") || filename.trim() === "") {
         throw new Error("Invalid filename");
     }
+}
+
+export function normalizeFileName(filename: string): string {
+    const sanitized = sanitize(filename, { replacement: "_" }).trim();
+    if (!sanitized) {
+        throw new Error("Invalid filename");
+    }
+    return sanitized;
+}
+
+export function normalizeDirName(name: string): string {
+    const sanitized = sanitize(name, { replacement: "_" }).trim();
+    if (!sanitized) {
+        return "Unknown Artist";
+    }
+    return sanitized;
 }

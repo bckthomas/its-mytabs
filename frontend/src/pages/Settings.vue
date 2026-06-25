@@ -105,6 +105,62 @@ export default defineComponent({
                 generalError(e);
             }
         },
+
+        /**
+         * Trigger import scan on the server
+         */
+        async scanImport() {
+            const ok = window.confirm("Scan the import folder and create tabs from files? This may take a while if there are many files.");
+            if (!ok) {
+                return;
+            }
+
+            try {
+                this.isProcessing = true;
+
+                // Preview duplicates first, then let user decide whether to import them.
+                const previewRes = await fetch(baseURL + `/api/admin/import-scan`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        dryRun: true,
+                        importDuplicates: false,
+                    }),
+                });
+                await checkFetch(previewRes);
+                const preview = await previewRes.json();
+
+                let importDuplicates = false;
+                const duplicateCount = Number(preview.duplicateCount || 0);
+                if (duplicateCount > 0) {
+                    importDuplicates = window.confirm(
+                        `Detected ${duplicateCount} duplicate file(s). Do you want to import duplicates as well?`,
+                    );
+                }
+
+                const res = await fetch(baseURL + `/api/admin/import-scan`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        dryRun: false,
+                        importDuplicates,
+                    }),
+                });
+                await checkFetch(res);
+                const data = await res.json();
+                successMessage(`Import complete: ${data.importedCount} imported, ${data.skippedCount} skipped, ${data.duplicateCount} duplicate(s) detected`);
+            } catch (e) {
+                generalError(e);
+            } finally {
+                this.isProcessing = false;
+            }
+        },
     },
     watch: {
         setting: {
@@ -232,11 +288,23 @@ export default defineComponent({
         <div class="mb-3">
             <label class="form-label">Load/Save Settings to Server</label>
 
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 flex-wrap">
                 <button class="btn btn-secondary" :disabled="isProcessing" @click.prevent="loadFromServer">Load from Server</button>
                 <button class="btn btn-secondary" :disabled="isProcessing" @click.prevent="saveToServer">Save to Server</button>
                 <button class="btn btn-danger" :disabled="isProcessing" @click.prevent="resetToDefault">Reset Local</button>
             </div>
+        </div>
+
+        <h2 class="mt-5 mb-4">Admin</h2>
+
+        <div class="mb-3">
+            <label class="form-label">Import</label>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" :disabled="isProcessing" @click.prevent="scanImport">Scan Import Folder</button>
+            </div>
+
+            <small class="text-secondary d-block mt-2">Scan <code>data/import</code> folder and create tabs from supported files. Files will be organized by artist name.</small>
         </div>
     </div>
 </template>

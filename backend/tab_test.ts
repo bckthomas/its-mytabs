@@ -1,6 +1,6 @@
 // "deno task test" to run this test
 
-import { assertEquals, assertExists, assertRejects, assertThrows } from "jsr:@std/assert@^1.0.17";
+import { assertEquals, assertExists, assertRejects } from "jsr:@std/assert@^1.0.17";
 import * as fs from "@std/fs";
 import * as path from "@std/path";
 
@@ -19,6 +19,7 @@ const {
     tabExists,
     getConfigJSON,
     createTab,
+    importTabsFromImportDir,
     getTab,
     deleteTab,
     updateConfigJSON,
@@ -91,6 +92,25 @@ Deno.test("getConfigJSON - existing tab", async () => {
     assertEquals(config!.youtube.length, 0);
 });
 
+Deno.test("importTabsFromImportDir - duplicate detection", async () => {
+    const tabData = new Uint8Array([101, 102, 103, 104]);
+    await createTab(tabData, "gp5", "Dup Test", "Dup Artist", "dup.gp5");
+
+    const importPath = path.join(tempDir, "import", "dup-copy.gp5");
+    await fs.ensureDir(path.dirname(importPath));
+    await Deno.writeFile(importPath, tabData);
+
+    const result = await importTabsFromImportDir({
+        dryRun: false,
+        importDuplicates: false,
+    });
+
+    assertEquals(result.duplicateCount >= 1, true);
+    assertEquals(result.importedCount, 0);
+    assertEquals(result.skippedCount >= 1, true);
+    assertEquals(await fs.exists(importPath), true);
+});
+
 Deno.test("updateConfigJSON - queuing", async () => {
     const tabData = new Uint8Array([13, 14, 15]);
     const id = await createTab(tabData, "gp", "Queue Test", "Queue Artist", "queue.gp");
@@ -129,15 +149,18 @@ Deno.test("deleteTab", async () => {
     assertEquals(exists, false);
 });
 
-Deno.test("getConfigJSONPath", () => {
-    const expectedPath = path.join(tempDir, "tabs", "123", "config.json");
-    const actualPath = getConfigJSONPath("123");
-    assertEquals(actualPath, expectedPath);
+Deno.test("getConfigJSONPath", async () => {
+    const tabData = new Uint8Array([13, 14, 15]);
+    const id = await createTab(tabData, "gp", "Config Path Test", "Config Artist", "config.gp");
+
+    const actualPath = await getConfigJSONPath(id);
+    assertEquals(await fs.exists(actualPath), true);
+    assertEquals(path.extname(actualPath), ".json");
 
     // Test path traversal protection
-    assertThrows(
-        () => {
-            getConfigJSONPath("../invalid");
+    await assertRejects(
+        async () => {
+            await getConfigJSONPath("../invalid");
         },
         Error,
         "Invalid filename",

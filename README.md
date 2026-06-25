@@ -25,6 +25,8 @@ https://its-mytabs.kuma.pet/tab/1?audio=youtube-VuKSlOT__9s&track=2
 - Sync your tabs with audio files (.mp3, .ogg) or Youtube videos
 - MIDI Synth - able to mute tracks and solo tracks
 - Supports .gp, .gpx, .gp3, .gp4, .gp5, .musicxml, .capx formats
+- Organizes tabs under data/tabs by artist (one folder per artist)
+- Supports mass import from data/import with duplicate detection
 - Simple UI/UX
 - Mobile friendly
 - Offer different cursor modes:
@@ -122,6 +124,25 @@ MYTABS_PORT=47777
 # (boolean) Whether to launch the browser when starting the app (Desktop only) (Default: true)
 MYTABS_LAUNCH_BROWSER=true
 ```
+
+## Data Folder Layout
+
+The application stores tabs and import files inside the data directory:
+
+```text
+data/
+    tabs/
+        Artist Name/
+            song.gp5
+            song.json
+    import/
+        bulk-file-1.gp5
+        bulk-file-2.gp3
+```
+
+- data/tabs uses one folder per artist.
+- data/import is used for bulk import (Settings > Admin > Scan Import Folder).
+- During bulk import, duplicate files are detected. You can choose whether to skip duplicates or import them anyway.
 
 ## Keyboard Shortcuts
 
